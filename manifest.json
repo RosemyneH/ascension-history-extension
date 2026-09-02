@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ascension Transaction History",
-  "version": "1.2.2",
+  "version": "1.2.3",
   "description": "Browse your Ascension.gg order history, DP spending, and purchase summaries.",
   "permissions": ["cookies", "storage", "tabs"],
   "host_permissions": [
@@ -14,10 +14,7 @@
   },
   "content_scripts": [
     {
-      "matches": [
-        "https://ascension.gg/*/user/overview",
-        "https://ascension.gg/*/user/overview/*"
-      ],
+      "matches": ["https://ascension.gg/*"],
       "js": ["content/inject.js"],
       "run_at": "document_idle"
     }

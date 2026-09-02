@@ -1,26 +1,40 @@
 const OVERVIEW_PATH = "/user/overview";
-const MOUNT_XPATH = "/html/body/div[3]/main[1]/div/div/div/div[1]/div[2]";
+const HOST_ID = "ascension-history-host";
+const STYLE_ID = "ascension-history-styles";
+
+const LAUNCHER_CLASSES = [
+  "flex", "justify-center", "transition", "select-none",
+  "border-2", "py-2", "px-4", "text-foreground", "rounded-full",
+  "font-semibold", "bg-secondary-alt", "hover:bg-secondary-alt2",
+  "border-none", "items-center", "gap-2", "w-full", "text-sm",
+  "font-default", "normal-case", "ascension-history-launcher",
+].join(" ");
 
 function isOverviewPage() {
   return location.pathname.includes(OVERVIEW_PATH);
 }
 
 function findMountPoint() {
-  const result = document.evaluate(
-    MOUNT_XPATH,
-    document,
-    null,
-    XPathResult.FIRST_ORDERED_NODE_TYPE,
-    null,
-  );
-  return result.singleNodeValue;
+  for (const h2 of document.querySelectorAll("h2")) {
+    if (!/your information/i.test(h2.textContent || "")) continue;
+
+    const card = h2.closest("div.bg-secondary");
+    if (!card) continue;
+
+    const content = card.querySelector(":scope > div.flex.flex-col.flex-1");
+    if (content) return content;
+  }
+
+  return null;
 }
 
-function injectStyles(shadow) {
+function ensureStyles() {
+  if (document.getElementById(STYLE_ID)) return;
   const link = document.createElement("link");
+  link.id = STYLE_ID;
   link.rel = "stylesheet";
   link.href = chrome.runtime.getURL("lib/panel.css");
-  shadow.appendChild(link);
+  document.head.appendChild(link);
 }
 
 function runRefresh(panel, connectOrdersRefresh, { force = false } = {}) {
@@ -55,86 +69,120 @@ function runRefresh(panel, connectOrdersRefresh, { force = false } = {}) {
   client.refresh(force);
 }
 
-async function ensureData(panel, connectOrdersRefresh, loadCachedOrders, loaded) {
+async function ensureData(panel, panelApi, loaded) {
   if (loaded.value) return;
 
-  const cached = await loadCachedOrders();
+  const cached = await panelApi.loadCachedOrders();
   if (cached) panel.applyPayload(cached);
 
-  runRefresh(panel, connectOrdersRefresh);
+  runRefresh(panel, panelApi.connectOrdersRefresh);
   loaded.value = true;
 }
 
-function mount(panelApi) {
-  const { createPanel, connectOrdersRefresh, loadCachedOrders } = panelApi;
+async function loadPanelApi() {
+  return import(chrome.runtime.getURL("lib/panel.js"));
+}
 
-  if (!isOverviewPage() || document.getElementById("ascension-history-host")) return false;
+function removeHost() {
+  document.getElementById(HOST_ID)?.remove();
+}
+
+function mount() {
+  if (!isOverviewPage()) {
+    removeHost();
+    return false;
+  }
+
+  if (document.getElementById(HOST_ID)) return true;
 
   const target = findMountPoint();
   if (!target) return false;
 
+  ensureStyles();
+
   const host = document.createElement("div");
-  host.id = "ascension-history-host";
-
-  const shadow = host.attachShadow({ mode: "open" });
-  injectStyles(shadow);
-
-  const root = document.createElement("div");
-  root.className = "ah-root";
-  shadow.appendChild(root);
+  host.id = HOST_ID;
+  host.className = "flex flex-col gap-4 pt-6 border-t border-neutral-600 min-w-0 mt-4 ascension-history-host";
 
   const launcher = document.createElement("button");
   launcher.type = "button";
-  launcher.className = "ah-launcher";
+  launcher.className = LAUNCHER_CLASSES;
   launcher.textContent = "Transaction History";
   launcher.setAttribute("aria-expanded", "false");
 
   const panelWrap = document.createElement("div");
   panelWrap.className = "ah-panel-wrap hidden";
 
-  root.append(launcher, panelWrap);
+  host.append(launcher, panelWrap);
+  target.append(host);
 
-  const panel = createPanel(panelWrap, {
-    onRefresh: ({ force }) => runRefresh(panel, connectOrdersRefresh, { force }),
-  });
-
+  let panel = null;
+  let panelApi = null;
   const loaded = { value: false };
 
   launcher.addEventListener("click", async () => {
     const hidden = panelWrap.classList.toggle("hidden");
     const isOpen = !hidden;
     launcher.setAttribute("aria-expanded", String(isOpen));
-    launcher.classList.toggle("ah-launcher-open", isOpen);
     launcher.textContent = isOpen ? "Hide Transaction History" : "Transaction History";
 
-    if (isOpen) await ensureData(panel, connectOrdersRefresh, loadCachedOrders, loaded);
+    if (!isOpen) return;
+
+    try {
+      if (!panelApi) {
+        panelApi = await loadPanelApi();
+        panel = panelApi.createPanel(panelWrap, {
+          onRefresh: ({ force }) => runRefresh(panel, panelApi.connectOrdersRefresh, { force }),
+        });
+      }
+      await ensureData(panel, panelApi, loaded);
+    } catch (err) {
+      console.error("[Ascension History]", err);
+      panelWrap.classList.remove("hidden");
+      panelWrap.innerHTML = `<div class="ah-error">Failed to load extension panel: ${err.message}</div>`;
+    }
   });
 
-  target.append(host);
   return true;
 }
 
-async function boot() {
-  if (!isOverviewPage()) return;
+function tryMount() {
+  mount();
+}
 
-  let panelApi;
-  try {
-    panelApi = await import(chrome.runtime.getURL("lib/panel.js"));
-  } catch (err) {
-    console.error("[Ascension History] Failed to load extension modules:", err);
-    return;
-  }
+function watchNavigation() {
+  const notify = () => setTimeout(tryMount, 0);
 
-  if (!mount(panelApi)) {
-    const observer = new MutationObserver(() => {
-      if (mount(panelApi)) observer.disconnect();
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
+  window.addEventListener("popstate", notify);
+
+  for (const method of ["pushState", "replaceState"]) {
+    const original = history[method];
+    history[method] = function patchedHistory(...args) {
+      const result = original.apply(this, args);
+      notify();
+      return result;
+    };
   }
 }
 
+function boot() {
+  tryMount();
+
+  const observer = new MutationObserver(() => {
+    if (isOverviewPage() && !document.getElementById(HOST_ID)) {
+      tryMount();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+
+  watchNavigation();
+  setInterval(() => {
+    if (isOverviewPage() && !document.getElementById(HOST_ID)) tryMount();
+  }, 1500);
+}
+
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", () => { boot(); });
+  document.addEventListener("DOMContentLoaded", boot);
 } else {
   boot();
 }

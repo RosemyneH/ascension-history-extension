@@ -2,6 +2,14 @@
   width: 100%;
 }
 
+.ascension-history-host {
+  width: 100%;
+}
+
+.ascension-history-launcher {
+  cursor: pointer;
+}
+
 .ah-launcher {
   display: inline-flex;
   align-items: center;
