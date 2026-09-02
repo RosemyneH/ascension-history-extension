@@ -1,3 +1,4 @@
+const AH = globalThis.__AscensionHistory;
 const OVERVIEW_PATH = "/user/overview";
 const HOST_ID = "ascension-history-host";
 const STYLE_ID = "ascension-history-styles";
@@ -17,14 +18,11 @@ function isOverviewPage() {
 function findMountPoint() {
   for (const h2 of document.querySelectorAll("h2")) {
     if (!/your information/i.test(h2.textContent || "")) continue;
-
     const card = h2.closest("div.bg-secondary");
     if (!card) continue;
-
     const content = card.querySelector(":scope > div.flex.flex-col.flex-1");
     if (content) return content;
   }
-
   return null;
 }
 
@@ -37,11 +35,10 @@ function ensureStyles() {
   document.head.appendChild(link);
 }
 
-function runRefresh(panel, connectOrdersRefresh, { force = false } = {}) {
+function runRefresh(panel, { force = false } = {}) {
   panel.setError("");
   panel.setRefreshing(true);
-
-  const client = connectOrdersRefresh({
+  const client = AH.connectOrdersRefresh({
     onProgress: (progress) => panel.setProgress(progress),
     onDone: (payload) => {
       panel.applyPayload(payload);
@@ -63,24 +60,17 @@ function runRefresh(panel, connectOrdersRefresh, { force = false } = {}) {
       panel.setRefreshing(false);
     },
   });
-
   panel.showProgress();
   panel.setStatus(force ? "Fetching order history…" : "Loading…");
   client.refresh(force);
 }
 
-async function ensureData(panel, panelApi, loaded) {
+async function ensureData(panel, loaded) {
   if (loaded.value) return;
-
-  const cached = await panelApi.loadCachedOrders();
+  const cached = await AH.loadCachedOrders();
   if (cached) panel.applyPayload(cached);
-
-  runRefresh(panel, panelApi.connectOrdersRefresh);
+  runRefresh(panel);
   loaded.value = true;
-}
-
-async function loadPanelApi() {
-  return import(chrome.runtime.getURL("lib/panel.js"));
 }
 
 function removeHost() {
@@ -88,6 +78,11 @@ function removeHost() {
 }
 
 function mount() {
+  if (!AH) {
+    console.error("[Ascension History] Library failed to load.");
+    return false;
+  }
+
   if (!isOverviewPage()) {
     removeHost();
     return false;
@@ -117,7 +112,6 @@ function mount() {
   target.append(host);
 
   let panel = null;
-  let panelApi = null;
   const loaded = { value: false };
 
   launcher.addEventListener("click", async () => {
@@ -125,22 +119,14 @@ function mount() {
     const isOpen = !hidden;
     launcher.setAttribute("aria-expanded", String(isOpen));
     launcher.textContent = isOpen ? "Hide Transaction History" : "Transaction History";
-
     if (!isOpen) return;
 
-    try {
-      if (!panelApi) {
-        panelApi = await loadPanelApi();
-        panel = panelApi.createPanel(panelWrap, {
-          onRefresh: ({ force }) => runRefresh(panel, panelApi.connectOrdersRefresh, { force }),
-        });
-      }
-      await ensureData(panel, panelApi, loaded);
-    } catch (err) {
-      console.error("[Ascension History]", err);
-      panelWrap.classList.remove("hidden");
-      panelWrap.innerHTML = `<div class="ah-error">Failed to load extension panel: ${err.message}</div>`;
+    if (!panel) {
+      panel = AH.createPanel(panelWrap, {
+        onRefresh: ({ force }) => runRefresh(panel, { force }),
+      });
     }
+    await ensureData(panel, loaded);
   });
 
   return true;
@@ -152,9 +138,7 @@ function tryMount() {
 
 function watchNavigation() {
   const notify = () => setTimeout(tryMount, 0);
-
   window.addEventListener("popstate", notify);
-
   for (const method of ["pushState", "replaceState"]) {
     const original = history[method];
     history[method] = function patchedHistory(...args) {
@@ -167,14 +151,9 @@ function watchNavigation() {
 
 function boot() {
   tryMount();
-
-  const observer = new MutationObserver(() => {
-    if (isOverviewPage() && !document.getElementById(HOST_ID)) {
-      tryMount();
-    }
-  });
-  observer.observe(document.body, { childList: true, subtree: true });
-
+  new MutationObserver(() => {
+    if (isOverviewPage() && !document.getElementById(HOST_ID)) tryMount();
+  }).observe(document.body, { childList: true, subtree: true });
   watchNavigation();
   setInterval(() => {
     if (isOverviewPage() && !document.getElementById(HOST_ID)) tryMount();
