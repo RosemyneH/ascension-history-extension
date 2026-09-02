@@ -1,5 +1,3 @@
-import { connectOrdersRefresh, createPanel, loadCachedOrders } from "../lib/panel.js";
-
 const OVERVIEW_PATH = "/user/overview";
 const MOUNT_XPATH = "/html/body/div[3]/main[1]/div/div/div/div[1]/div[2]";
 
@@ -25,7 +23,7 @@ function injectStyles(shadow) {
   shadow.appendChild(link);
 }
 
-function runRefresh(panel, { force = false } = {}) {
+function runRefresh(panel, connectOrdersRefresh, { force = false } = {}) {
   panel.setError("");
   panel.setRefreshing(true);
 
@@ -57,17 +55,19 @@ function runRefresh(panel, { force = false } = {}) {
   client.refresh(force);
 }
 
-async function ensureData(panel, loaded) {
+async function ensureData(panel, connectOrdersRefresh, loadCachedOrders, loaded) {
   if (loaded.value) return;
 
   const cached = await loadCachedOrders();
   if (cached) panel.applyPayload(cached);
 
-  runRefresh(panel);
+  runRefresh(panel, connectOrdersRefresh);
   loaded.value = true;
 }
 
-function mount() {
+function mount(panelApi) {
+  const { createPanel, connectOrdersRefresh, loadCachedOrders } = panelApi;
+
   if (!isOverviewPage() || document.getElementById("ascension-history-host")) return false;
 
   const target = findMountPoint();
@@ -95,38 +95,46 @@ function mount() {
   root.append(launcher, panelWrap);
 
   const panel = createPanel(panelWrap, {
-    onRefresh: ({ force }) => runRefresh(panel, { force }),
+    onRefresh: ({ force }) => runRefresh(panel, connectOrdersRefresh, { force }),
   });
 
   const loaded = { value: false };
 
   launcher.addEventListener("click", async () => {
-    const open = panelWrap.classList.toggle("hidden");
-    const isOpen = !open;
+    const hidden = panelWrap.classList.toggle("hidden");
+    const isOpen = !hidden;
     launcher.setAttribute("aria-expanded", String(isOpen));
     launcher.classList.toggle("ah-launcher-open", isOpen);
     launcher.textContent = isOpen ? "Hide Transaction History" : "Transaction History";
 
-    if (isOpen) await ensureData(panel, loaded);
+    if (isOpen) await ensureData(panel, connectOrdersRefresh, loadCachedOrders, loaded);
   });
 
   target.append(host);
   return true;
 }
 
-function boot() {
+async function boot() {
   if (!isOverviewPage()) return;
 
-  if (!mount()) {
+  let panelApi;
+  try {
+    panelApi = await import(chrome.runtime.getURL("lib/panel.js"));
+  } catch (err) {
+    console.error("[Ascension History] Failed to load extension modules:", err);
+    return;
+  }
+
+  if (!mount(panelApi)) {
     const observer = new MutationObserver(() => {
-      if (mount()) observer.disconnect();
+      if (mount(panelApi)) observer.disconnect();
     });
     observer.observe(document.body, { childList: true, subtree: true });
   }
 }
 
 if (document.readyState === "loading") {
-  document.addEventListener("DOMContentLoaded", boot);
+  document.addEventListener("DOMContentLoaded", () => { boot(); });
 } else {
   boot();
 }

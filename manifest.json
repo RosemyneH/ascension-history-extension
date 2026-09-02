@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "Ascension Transaction History",
-  "version": "1.2.1",
+  "version": "1.2.2",
   "description": "Browse your Ascension.gg order history, DP spending, and purchase summaries.",
   "permissions": ["cookies", "storage", "tabs"],
   "host_permissions": [
@@ -19,13 +19,12 @@
         "https://ascension.gg/*/user/overview/*"
       ],
       "js": ["content/inject.js"],
-      "type": "module",
       "run_at": "document_idle"
     }
   ],
   "web_accessible_resources": [
     {
-      "resources": ["lib/panel.css"],
+      "resources": ["lib/panel.css", "lib/panel.js", "lib/ascension.js"],
       "matches": ["https://ascension.gg/*"]
     }
   ],
