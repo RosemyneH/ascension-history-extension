@@ -83,6 +83,16 @@
   flex-shrink: 0;
 }
 
+.ah-export-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.ah-export-group.hidden {
+  display: none !important;
+}
+
 .ah-export {
   padding: 8px 12px;
   border: 1px solid var(--ah-border);
@@ -100,8 +110,8 @@
   color: var(--ah-gold);
 }
 
-.ah-export.hidden {
-  display: none !important;
+.ah-export-html {
+  min-width: 52px;
 }
 
 .ah-brand strong {
