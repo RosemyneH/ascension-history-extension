@@ -1,0 +1,45 @@
+{
+  "manifest_version": 3,
+  "name": "Ascension Transaction History",
+  "version": "1.2.0",
+  "description": "Browse your Ascension.gg order history, DP spending, and purchase summaries.",
+  "permissions": ["cookies", "storage", "tabs"],
+  "host_permissions": [
+    "https://api.ascension.gg/*",
+    "https://ascension.gg/*"
+  ],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "content_scripts": [
+    {
+      "matches": [
+        "https://ascension.gg/*/user/overview",
+        "https://ascension.gg/*/user/overview/*"
+      ],
+      "js": ["content/inject.js"],
+      "type": "module",
+      "run_at": "document_idle"
+    }
+  ],
+  "web_accessible_resources": [
+    {
+      "resources": ["lib/panel.css"],
+      "matches": ["https://ascension.gg/*"]
+    }
+  ],
+  "action": {
+    "default_title": "Open Ascension History",
+    "default_icon": {
+      "16": "icons/icon16.png",
+      "48": "icons/icon48.png",
+      "128": "icons/icon128.png"
+    }
+  },
+  "icons": {
+    "16": "icons/icon16.png",
+    "48": "icons/icon48.png",
+    "128": "icons/icon128.png"
+  }
+}

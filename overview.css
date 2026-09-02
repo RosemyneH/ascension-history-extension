@@ -1,0 +1,30 @@
+:root {
+  color-scheme: dark;
+  --bg: #12101a;
+  --text: #ece6f8;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html, body {
+  margin: 0;
+  min-height: 100vh;
+  font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+}
+
+.page {
+  width: 100%;
+  max-width: 1080px;
+  min-height: 100vh;
+  margin: 0 auto;
+  padding: 20px 24px 32px;
+}
+
+#page .ah-panel,
+#app .ah-panel {
+  margin: 0;
+}
