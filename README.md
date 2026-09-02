@@ -9,6 +9,7 @@ It reads your existing browser session (no cookie copy/paste) and adds a **Trans
 - **Overview button** — opens your full history inline on `ascension.gg/.../user/overview`
 - **Summary stats** — DP spent, DP purchased, gateway breakdown
 - **Search & filters** — All / Shop / Purchases
+- **Export CSV** — download the current filtered list
 - **Standalone tab** — click the extension icon for a full-page view
 - **Local cache** — shows cached data instantly, refreshes in the background
 

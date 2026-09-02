@@ -76,6 +76,34 @@
   background: linear-gradient(180deg, #1c1728 0%, var(--ah-bg) 100%);
 }
 
+.ah-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.ah-export {
+  padding: 8px 12px;
+  border: 1px solid var(--ah-border);
+  border-radius: 8px;
+  background: var(--ah-surface);
+  color: var(--ah-text);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.ah-export:hover {
+  border-color: var(--ah-gold-dim);
+  color: var(--ah-gold);
+}
+
+.ah-export.hidden {
+  display: none !important;
+}
+
 .ah-brand strong {
   display: block;
   font-size: 16px;

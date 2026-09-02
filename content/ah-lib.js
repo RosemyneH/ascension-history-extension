@@ -153,6 +153,48 @@
     return ORDER_TYPES[type] || `Type ${type}`;
   }
 
+  function typeLabel(type) {
+    return ORDER_TYPES[type] || `Type ${type}`;
+  }
+
+  function csvCell(value) {
+    const text = String(value ?? "");
+    if (/[",\n\r]/.test(text)) return `"${text.replace(/"/g, '""')}"`;
+    return text;
+  }
+
+  function ordersToCsv(orders) {
+    const headers = ["Date", "Type", "Description", "Character", "DP", "VP", "USD", "Gateway"];
+    const rows = orders.map((order) => {
+      const type = Number(order.type);
+      const dp = orderDpAmount(order);
+      const vp = orderVpAmount(order);
+      const usd = orderUsdAmount(order);
+      return [
+        order.created_at || "",
+        typeLabel(type),
+        orderDescription(order),
+        (order.data || {}).name || "",
+        type === 0 ? (dp ? -dp : 0) : dp,
+        vp || "",
+        usd ?? "",
+        type === 1 ? gatewayName(order) : "",
+      ];
+    });
+    return [headers, ...rows].map((row) => row.map(csvCell).join(",")).join("\n");
+  }
+
+  function downloadOrdersCsv(orders) {
+    const date = new Date().toISOString().slice(0, 10);
+    const blob = new Blob([ordersToCsv(orders)], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `ascension-transactions-${date}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   function formatNumber(n) {
     return Number(n || 0).toLocaleString();
   }
@@ -169,7 +211,10 @@
     return `<div class="ah-panel">
       <header class="ah-header">
         <div class="ah-brand"><strong>Transaction History</strong><span class="ah-status">Loading…</span></div>
-        <button type="button" class="ah-refresh" title="Refresh" aria-label="Refresh">↻</button>
+        <div class="ah-header-actions">
+          <button type="button" class="ah-export hidden">Export CSV</button>
+          <button type="button" class="ah-refresh" title="Refresh" aria-label="Refresh">↻</button>
+        </div>
       </header>
       <div class="ah-error hidden"></div>
       <div class="ah-progress hidden"><div class="ah-progress-bar"><div class="ah-progress-fill"></div></div><span class="ah-progress-text">Fetching…</span></div>
@@ -210,6 +255,7 @@
       list: root.querySelector(".ah-list"),
       footer: root.querySelector(".ah-footer"),
       listCount: root.querySelector(".ah-list-count"),
+      exportBtn: root.querySelector(".ah-export"),
       refresh: root.querySelector(".ah-refresh"),
       search: root.querySelector(".ah-search"),
       statShopDp: root.querySelector(".ah-stat-dp-spent"),
@@ -275,8 +321,12 @@
       return `<article class="ah-order"><div class="ah-order-date">${formatDate(order.created_at)}</div><div class="ah-order-main"><div class="ah-order-title">${escapeHtml(orderDescription(order))}</div><div class="ah-order-meta"><span class="ah-badge ${type === 0 ? "ah-badge-shop" : "ah-badge-purchase"}">${typeLabel(type)}</span>${char ? ` · ${escapeHtml(char)}` : ""}</div></div><div class="ah-order-amounts">${amountHtml}</div></article>`;
     }
 
+    function getFilteredOrders() {
+      return orders.filter(orderMatchesFilter);
+    }
+
     function renderList() {
-      const filtered = orders.filter(orderMatchesFilter);
+      const filtered = getFilteredOrders();
       els.list.innerHTML = filtered.length
         ? filtered.map(renderOrder).join("")
         : `<div class="ah-empty">No transactions match your filter.</div>`;
@@ -299,6 +349,7 @@
         ? `Cached · ${formatDate(payload.cachedAt)}`
         : `Updated · ${formatNumber(payload.total)} orders`;
       renderAll();
+      show(els.exportBtn);
     }
 
     root.querySelectorAll(".ah-filter").forEach((btn) => {
@@ -314,6 +365,11 @@
       renderList();
     });
     els.refresh.addEventListener("click", () => onRefresh({ force: true }));
+    els.exportBtn.addEventListener("click", () => {
+      const filtered = getFilteredOrders();
+      if (!filtered.length) return;
+      downloadOrdersCsv(filtered);
+    });
 
     return {
       setError, applyPayload,
