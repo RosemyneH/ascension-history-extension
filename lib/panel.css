@@ -1,3 +1,36 @@
+.ah-root {
+  width: 100%;
+}
+
+.ah-launcher {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: 10px 16px;
+  border: 1px solid var(--ah-gold-dim, #a8882a);
+  border-radius: 8px;
+  background: rgba(212, 175, 55, 0.12);
+  color: var(--ah-gold, #d4af37);
+  font: 600 14px/1.2 "Segoe UI", system-ui, sans-serif;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.ah-launcher:hover,
+.ah-launcher.ah-launcher-open {
+  background: rgba(212, 175, 55, 0.22);
+  border-color: var(--ah-gold, #d4af37);
+}
+
+.ah-panel-wrap {
+  margin-top: 12px;
+}
+
+.ah-panel-wrap.hidden {
+  display: none !important;
+}
+
 .ah-panel {
   --ah-bg: #16131f;
   --ah-surface: #211c2e;

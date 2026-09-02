@@ -1,20 +1,21 @@
 import { connectOrdersRefresh, createPanel, loadCachedOrders } from "../lib/panel.js";
 
 const OVERVIEW_PATH = "/user/overview";
+const MOUNT_XPATH = "/html/body/div[3]/main[1]/div/div/div/div[1]/div[2]";
 
 function isOverviewPage() {
   return location.pathname.includes(OVERVIEW_PATH);
 }
 
 function findMountPoint() {
-  return (
-    document.querySelector("main .container")
-    || document.querySelector("main")
-    || document.querySelector('[class*="overview"]')
-    || document.querySelector("#__next main")
-    || document.querySelector("#__next > div")
-    || document.body
+  const result = document.evaluate(
+    MOUNT_XPATH,
+    document,
+    null,
+    XPathResult.FIRST_ORDERED_NODE_TYPE,
+    null,
   );
+  return result.singleNodeValue;
 }
 
 function injectStyles(shadow) {
@@ -56,8 +57,21 @@ function runRefresh(panel, { force = false } = {}) {
   client.refresh(force);
 }
 
-async function mount() {
-  if (!isOverviewPage() || document.getElementById("ascension-history-host")) return;
+async function ensureData(panel, loaded) {
+  if (loaded.value) return;
+
+  const cached = await loadCachedOrders();
+  if (cached) panel.applyPayload(cached);
+
+  runRefresh(panel);
+  loaded.value = true;
+}
+
+function mount() {
+  if (!isOverviewPage() || document.getElementById("ascension-history-host")) return false;
+
+  const target = findMountPoint();
+  if (!target) return false;
 
   const host = document.createElement("div");
   host.id = "ascension-history-host";
@@ -65,31 +79,50 @@ async function mount() {
   const shadow = host.attachShadow({ mode: "open" });
   injectStyles(shadow);
 
-  const mountRoot = document.createElement("div");
-  shadow.appendChild(mountRoot);
+  const root = document.createElement("div");
+  root.className = "ah-root";
+  shadow.appendChild(root);
 
-  const panel = createPanel(mountRoot, {
+  const launcher = document.createElement("button");
+  launcher.type = "button";
+  launcher.className = "ah-launcher";
+  launcher.textContent = "Transaction History";
+  launcher.setAttribute("aria-expanded", "false");
+
+  const panelWrap = document.createElement("div");
+  panelWrap.className = "ah-panel-wrap hidden";
+
+  root.append(launcher, panelWrap);
+
+  const panel = createPanel(panelWrap, {
     onRefresh: ({ force }) => runRefresh(panel, { force }),
   });
 
-  findMountPoint().prepend(host);
+  const loaded = { value: false };
 
-  const cached = await loadCachedOrders();
-  if (cached) panel.applyPayload(cached);
+  launcher.addEventListener("click", async () => {
+    const open = panelWrap.classList.toggle("hidden");
+    const isOpen = !open;
+    launcher.setAttribute("aria-expanded", String(isOpen));
+    launcher.classList.toggle("ah-launcher-open", isOpen);
+    launcher.textContent = isOpen ? "Hide Transaction History" : "Transaction History";
 
-  runRefresh(panel);
+    if (isOpen) await ensureData(panel, loaded);
+  });
+
+  target.append(host);
+  return true;
 }
 
 function boot() {
   if (!isOverviewPage()) return;
 
-  mount();
-
-  const observer = new MutationObserver(() => {
-    if (!document.getElementById("ascension-history-host")) mount();
-  });
-
-  observer.observe(document.body, { childList: true, subtree: true });
+  if (!mount()) {
+    const observer = new MutationObserver(() => {
+      if (mount()) observer.disconnect();
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+  }
 }
 
 if (document.readyState === "loading") {

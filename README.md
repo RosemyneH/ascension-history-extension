@@ -2,11 +2,11 @@
 
 Chrome extension that shows your full [Ascension.gg](https://ascension.gg) billing history — DP spent, DP purchased, USD totals, and a searchable transaction list.
 
-It reads your existing browser session (no cookie copy/paste) and injects a panel directly on your account overview page.
+It reads your existing browser session (no cookie copy/paste) and adds a **Transaction History** button on your account overview page.
 
 ## Features
 
-- **In-page panel** on `ascension.gg/.../user/overview`
+- **Overview button** — opens your full history inline on `ascension.gg/.../user/overview`
 - **Summary stats** — DP spent, DP purchased, gateway breakdown
 - **Search & filters** — All / Shop / Purchases
 - **Standalone tab** — click the extension icon for a full-page view
@@ -24,8 +24,8 @@ It reads your existing browser session (no cookie copy/paste) and injects a pane
 
 1. Log in at [ascension.gg](https://ascension.gg) in the same browser
 2. Open your account overview: `https://ascension.gg/en/user/overview`
-3. The **Transaction History** panel appears at the top of the page
-4. Click **↻** to force a fresh fetch from the API
+3. Click **Transaction History** in the overview sidebar area
+4. Click **↻** inside the panel to force a fresh fetch from the API
 
 You can also click the extension toolbar icon to open the history in a regular browser tab.
 
@@ -63,7 +63,7 @@ A standalone Python report script with the same analysis logic is available sepa
 
 ## Troubleshooting
 
-**Panel doesn't appear on overview**
+**Button doesn't appear on overview**
 - Reload the extension at `chrome://extensions`
 - Hard-refresh the overview page
 - Confirm you're logged in at ascension.gg
